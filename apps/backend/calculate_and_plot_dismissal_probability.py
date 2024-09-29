@@ -2,22 +2,23 @@ import matplotlib.pyplot as plt
 import json
 import os
 from collections import defaultdict
+from constants import cricket_format_dict
 
 # Path where IPL JSON files are stored
-circket_format_dict = {
-    "IPL": {
-        "file_name": './ipl_json',
-        "title": 'IPL'
-    },
-    "ODI": {
-        "file_name": './odis_json',
-        "title": 'ODI'
-    },
-    "T20": {
-        "file_name": './t20s_json',
-        "title": 'T20'
-    }
-}
+# circket_format_dict = {
+#     "IPL": {
+#         "file_name": './',
+#         "title": 'IPL'
+#     },
+#     "ODI": {
+#         "file_name": './odis_json',
+#         "title": 'ODI'
+#     },
+#     "T20": {
+#         "file_name": './t20s_json',
+#         "title": 'T20'
+#     }
+# }
 
 # IPL_DATA_DIR = './ipl_json'
 # ODI_DATA_DIR = './odis_json'
@@ -29,12 +30,12 @@ def calculate_and_plot_dismissal_probability(batter_name, current_format, plot_g
     # Dictionaries to store total balls faced and dismissals on nth ball
     balls_faced = defaultdict(int)
     dismissals_on_ball = defaultdict(int)
-    file_sample_set = os.listdir(circket_format_dict[current_format]["file_name"])[:]
+    file_sample_set = os.listdir(cricket_format_dict[current_format]["file_name"])[:]
 
     # Loop through all JSON files in the json folder
     for filename in file_sample_set:
         if filename.endswith(".json"):
-            file_path = os.path.join(circket_format_dict[current_format]["file_name"], filename)
+            file_path = os.path.join(cricket_format_dict[current_format]["file_name"], filename)
             
             with open(file_path) as file:
                 match_data = json.load(file)
