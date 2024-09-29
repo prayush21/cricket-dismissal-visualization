@@ -1,0 +1,12 @@
+{
+    "private": true,
+    "workspaces": [
+        "apps/frontend"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm:dev --prefix apps/frontend\" \"python apps/backend/app.py\""
+    },
+    "devDependencies": {
+        "concurrently": "^9.0.1"
+    }
+}
