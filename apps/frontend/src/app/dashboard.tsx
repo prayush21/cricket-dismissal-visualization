@@ -23,9 +23,11 @@ ChartJS.register(
 );
 
 type PlayerStats = {
-  batter_name: string;
-  dismissal_counts: { [key: string]: number };
-  dismissal_probabilities: { [key: string]: number };
+  max_runs_scored: number;
+
+  dismissals_on_ball: { [key: string]: number };
+  dismissals_on_run: { [key: string]: number };
+  matches_played: number;
 };
 
 const Dashboard = () => {
@@ -35,6 +37,8 @@ const Dashboard = () => {
   const [players, setPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"ball" | "run">("ball");
 
   useEffect(() => {
     fetchTeams();
@@ -54,7 +58,7 @@ const Dashboard = () => {
 
   const fetchTeams = async () => {
     try {
-      const response = await api.get(`/teams?format=${format}`);
+      const response = await api.get(`/api/v2/teams?format=${format}`);
       setTeams(response.data);
     } catch (error) {
       console.error("Error fetching teams:", error);
@@ -64,7 +68,7 @@ const Dashboard = () => {
   const fetchPlayers = async () => {
     try {
       const response = await api.get(
-        `/players?format=${format}&team=${selectedTeam}`
+        `/api/v2/players?format=${format}&team=${selectedTeam}`
       );
       setPlayers(response.data);
     } catch (error) {
@@ -75,7 +79,7 @@ const Dashboard = () => {
   const fetchPlayerStats = async () => {
     try {
       const response = await api.get(
-        `/player_stats?format=${format}&batter_name=${selectedPlayer}`
+        `/api/v2/player-stats?format=${format}&player=${selectedPlayer}`
       );
       setPlayerStats(response.data);
     } catch (error) {
@@ -83,44 +87,72 @@ const Dashboard = () => {
     }
   };
 
-  const chartData = {
-    labels: playerStats ? Object.keys(playerStats.dismissal_counts) : [],
+  // const chartDataForBalls = {
+  //   labels: playerStats ? Object.keys(playerStats.dismissals_on_ball) : [],
+  //   datasets: [
+  //     {
+  //       label: "Dismissal Counts",
+  //       data: playerStats ? Object.values(playerStats.dismissals_on_ball) : [],
+  //       backgroundColor: "rgba(75, 192, 192, 0.6)",
+  //       borderColor: "rgba(75, 192, 192, 1)",
+  //       borderWidth: 1,
+  //     },
+  //   ],
+  // };
+
+  const createChartData = (data: { [key: string]: number }) => ({
+    labels: Object.keys(data),
     datasets: [
       {
         label: "Dismissal Counts",
-        data: playerStats ? Object.values(playerStats.dismissal_counts) : [],
+        data: Object.values(data),
         backgroundColor: "rgba(75, 192, 192, 0.6)",
         borderColor: "rgba(75, 192, 192, 1)",
         borderWidth: 1,
       },
     ],
-  };
+  });
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "top" as const,
-        labels: {
+  // const chartDataForRuns = {
+  //   labels: playerStats ? Object.keys(playerStats.dismissals_on_ball) : [],
+  //   datasets: [
+  //     {
+  //       label: "Dismissal Counts",
+  //       data: playerStats ? Object.values(playerStats.dismissals_on_ball) : [],
+  //       backgroundColor: "rgba(75, 192, 192, 0.6)",
+  //       borderColor: "rgba(75, 192, 192, 1)",
+  //       borderWidth: 1,
+  //     },
+  //   ],
+  // };
+
+  const chartOptions = (text: string) => {
+    return {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top" as const,
+          labels: {
+            color: "white",
+          },
+        },
+        title: {
+          display: true,
+          text: text,
           color: "white",
         },
       },
-      title: {
-        display: true,
-        text: `Dismissal Counts for ${selectedPlayer} in ${format}`,
-        color: "white",
+      scales: {
+        x: {
+          ticks: { color: "white" },
+          grid: { color: "rgba(255, 255, 255, 0.1)" },
+        },
+        y: {
+          ticks: { color: "white" },
+          grid: { color: "rgba(255, 255, 255, 0.1)" },
+        },
       },
-    },
-    scales: {
-      x: {
-        ticks: { color: "white" },
-        grid: { color: "rgba(255, 255, 255, 0.1)" },
-      },
-      y: {
-        ticks: { color: "white" },
-        grid: { color: "rgba(255, 255, 255, 0.1)" },
-      },
-    },
+    };
   };
 
   return (
@@ -183,10 +215,62 @@ const Dashboard = () => {
         </select>
       </div>
 
+      {/* {playerStats && (
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-4">Player Statistics</h2>
+          <Bar data={chartDataForBalls} options={chartOptions(false)} />
+        </div>
+      )}
+
       {playerStats && (
         <div className="mt-8">
           <h2 className="text-2xl font-bold mb-4">Player Statistics</h2>
-          <Bar data={chartData} options={chartOptions} />
+          <Bar data={chartDataForRuns} options={chartOptions(true)} />
+        </div>
+      )} */}
+
+      {playerStats && (
+        <div className="mt-8 space-y-8">
+          <h2 className="text-2xl font-bold mb-4">Player Statistics</h2>
+          <div className="bg-gray-700 rounded-lg overflow-hidden">
+            <div className="flex border-b border-gray-600">
+              <button
+                className={`flex-1 py-2 px-4 text-center ${
+                  activeTab === "ball" ? "bg-blue-600" : "hover:bg-gray-600"
+                }`}
+                onClick={() => setActiveTab("ball")}
+              >
+                Dismissals by Ball
+              </button>
+              <button
+                className={`flex-1 py-2 px-4 text-center ${
+                  activeTab === "run" ? "bg-blue-600" : "hover:bg-gray-600"
+                }`}
+                onClick={() => setActiveTab("run")}
+              >
+                Dismissals by Run
+              </button>
+            </div>
+            <div className="p-4">
+              {activeTab === "ball" && (
+                <Bar
+                  data={createChartData(playerStats.dismissals_on_ball)}
+                  options={chartOptions(
+                    `Dismissal Counts by Ball for ${selectedPlayer} in ${format}`
+                  )}
+                />
+              )}
+              {activeTab === "run" && (
+                <Bar
+                  data={createChartData(playerStats.dismissals_on_run)}
+                  options={chartOptions(
+                    `Dismissal Counts by Run for ${selectedPlayer} in ${format}`
+                  )}
+                />
+              )}
+            </div>
+          </div>
+          {/* ... (match statistics code) */}
         </div>
       )}
     </div>
