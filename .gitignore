@@ -5,3 +5,5 @@ venv/
 *.pem
 
 apps/backend/*_json
+
+apps/db/db_dump/

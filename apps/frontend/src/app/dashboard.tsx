@@ -23,11 +23,11 @@ ChartJS.register(
 );
 
 type PlayerStats = {
-  max_runs_scored: number;
+  max_runs_scored: number | null;
 
   dismissals_on_ball: { [key: string]: number };
   dismissals_on_run: { [key: string]: number };
-  matches_played: number;
+  matches_played: number | null;
 };
 
 const Dashboard = () => {
@@ -81,8 +81,15 @@ const Dashboard = () => {
       const response = await api.get(
         `/api/v2/player-stats?format=${format}&player=${selectedPlayer}`
       );
+      console.log("res.data", response.data);
       setPlayerStats(response.data);
     } catch (error) {
+      setPlayerStats({
+        max_runs_scored: null,
+        dismissals_on_ball: {},
+        dismissals_on_run: {},
+        matches_played: null,
+      });
       console.error("Error fetching player stats:", error);
     }
   };

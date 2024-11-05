@@ -1,0 +1,1 @@
+DROP TABLE players, players_teams, player_stats, teams, formats, teams_formats CASCADE;

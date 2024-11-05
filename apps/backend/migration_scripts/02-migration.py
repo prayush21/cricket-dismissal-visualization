@@ -2,14 +2,23 @@ import sys
 import os
 import json
 import psycopg2
+import logging
 from collections import defaultdict
+
+# Configure logging
+logging.basicConfig(
+    filename='migration.log',  # Log file name
+    level=logging.INFO,        # Log level
+    format='%(asctime)s - %(levelname)s - %(message)s'  # Log format
+)
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from constants import cricket_format_dict
 
 # Establish a connection to PostgreSQL
 conn = psycopg2.connect(
-    dbname=os.getenv("DB_NAME", "my-dummy-cricket-db"),
+    dbname=os.getenv("DB_NAME", "player_stats_db"),
     user=os.getenv("DB_USER", "prayushdave"),
     password=os.getenv("DB_PASSWORD"),
     host=os.getenv("DB_HOST", "localhost")
@@ -56,11 +65,11 @@ for format_name, folder in formats_dirs.items():
     folder_path = cricket_format_dict[format_name]["file_name"]
     
     file_sample_set = os.listdir(folder_path)
-    print('Starting migration for format: ', format_name)
+    logging.info('Starting migration for format: ', format_name)
     for file_name in file_sample_set:
         if file_name.endswith('.json'):
             with open(os.path.join(folder_path, file_name)) as f:
-                print('Processing file: ', file_name)
+                logging.info('Processing file: %s', file_name)
                 match_data = json.load(f)
                 info = match_data['info']
                 match_format = info['match_type']  # T20, ODI, or IPL
@@ -126,7 +135,7 @@ for format_name, folder in formats_dirs.items():
                                     # innings_score_card[player_out_id]['is_out'] = True
                                     match_score_card[player_out_id]['is_out'] = True
                     
-                printLogInningsScoreCard(match_score_card)
+                # printLogInningsScoreCard(match_score_card)
                 for player_id, stats in match_score_card.items():
                     if stats.get('is_out', False) and stats.get('has_played'):
                         player_stats[player_id][match_format]['dismissals_on_ball'][stats['balls_faced']] = player_stats[player_id][match_format]['dismissals_on_ball'].get(stats['balls_faced'], 0) + 1
@@ -141,34 +150,103 @@ for format_name, folder in formats_dirs.items():
 
 # Step 4: Insert Data into Tables
 
-print('Players: ', len(players))
-print('-'*100)
-print('Teams: ', len(teams))
-print('-'*100)
-print('Players-Teams: ', len(players_teams))
-print('-'*100)
-print('Teams-Formats: ', len(teams_formats))
-print('-'*100)
-print('Player Stats: ', len(player_stats))
-print('-'*100)
+logging.info('Players: %d', len(players))
+logging.info('Teams: %d', len(teams))
+logging.info('Players-Teams: %d', len(players_teams))
+logging.info('Teams-Formats: %s', len(teams_formats))
+logging.info('Player Stats: %d', len(player_stats))
+
+# Add Players to the players table with the json_id from the players dict
+def insert_players(cursor, players):
+    """
+    Insert players into the players table.
+
+    :param cursor: Database cursor
+    :param players: Dictionary of players with player names as keys and json_id as values
+    """
+    player_data = [(name, json_id) for name, json_id in players.items()]
+    cursor.executemany("INSERT INTO players (name, json_id) VALUES (%s, %s)", player_data)
+
+# Call the function to insert players
+insert_players(cursor, players)
 
 
-# Fetch player_id to json_id mapping
+def insert_teams(cursor, teams):
+    """
+    Insert teams into the teams table.
+
+    :param cursor: Database cursor
+    :param teams: Dictionary of teams with team names as keys
+    """
+    team_data = [(team,) for team in teams.values()]
+    cursor.executemany("INSERT INTO teams (name) VALUES (%s);", team_data)
+
+# Call the function to insert teams.
+insert_teams(cursor, teams)
+
+
 player_id_map = get_id_map(cursor, 'players')
-print('player_id_map', len(player_id_map))
-# print('player_id_map', player_id_map)
-
-# Insert player statistics into player_stats table
-cursor.execute("SELECT id, name FROM formats")
+team_id_map = get_id_map(cursor, 'teams', id_column='id', key_column='name')
 format_id_map = get_id_map(cursor, 'formats', key_column='name')
 
-# print('Format ID Map: ', format_id_map)
+def insert_players_teams(cursor, players_teams, player_id_map, team_id_map):
+    """
+    Insert player_id and team_id into the players_teams table based on json_id.
+
+    :param cursor: Database cursor
+    :param players_teams: Dictionary with (json_id, team_id) pairs
+    :param players_id_map: Dictionary with (json_id, player_id) pairs
+    """      
+
+
+
+    # Prepare data for insertion
+    players_teams_data = []
+    for json_id, team_name in players_teams:
+        player_id = player_id_map.get(json_id)
+        team_id = team_id_map.get(team_name)
+        if player_id is not None:
+            players_teams_data.append((player_id, team_id))
+        else:
+            logging.warning("json_id %s not found in players table.", json_id)
+
+    # Insert into players_teams table
+    if players_teams_data:
+        cursor.executemany("""
+            INSERT INTO players_teams (player_id, team_id)
+            VALUES (%s, %s)
+            ON CONFLICT (player_id, team_id) DO NOTHING;  -- Avoid duplicates
+        """, players_teams_data)
+
+insert_players_teams(cursor, players_teams, player_id_map, team_id_map)
+
+
+def insert_teams_formats(cursor, teams_formats, team_id_map, format_id_map):
+    teams_formats_data = []
+    for team, format in teams_formats:
+        team_id = team_id_map.get(team)
+        format_id = format_id_map.get(format)
+
+        if team_id is not None:
+            teams_formats_data.append((team_id, format_id))
+        else:
+            logging.warning("Warning: Team id: %s not present.", team_id)
+
+
+        cursor.executemany("""
+            INSERT INTO teams_formats (team_id, format_id)
+            VALUES (%s, %s)
+            ON CONFLICT (team_id, format_id) DO NOTHING;  -- Avoid duplicates
+        """, teams_formats_data)
+        
+insert_teams_formats(cursor, teams_formats, team_id_map, format_id_map)
+
 player_stats_data = []
 for player_id, formats in player_stats.items():
     for format_name, stats in formats.items():
         # print(f"Attempting to access player_id: {player_id}")
         if player_id not in player_id_map:
-            print(f"Player ID {player_id} not found in player_id_map")
+            logging.warning(f"Player ID {player_id} not found in player_id_map")
         else:
             player_stats_data.append((
                 player_id_map[player_id],
