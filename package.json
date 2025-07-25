@@ -4,7 +4,13 @@
         "apps/frontend"
     ],
     "scripts": {
-        "dev": "concurrently \"npm:dev --prefix apps/frontend\" \"python apps/backend/app.py\""
+        "dev": "concurrently \"npm:dev --prefix apps/frontend\" \"python3 apps/backend/app.py\"",
+        "build": "npm run build:frontend && npm run build:backend",
+        "build:frontend": "npm run build --prefix apps/frontend",
+        "build:backend": "pip install -r apps/backend/requirements.txt",
+        "start:frontend": "npm start --prefix apps/frontend",
+        "start:backend": "gunicorn --chdir apps/backend app:app",
+        "start": "npm run start:frontend & npm run start:backend"
     },
     "devDependencies": {
         "concurrently": "^9.0.1"
