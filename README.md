@@ -1,4 +1,4 @@
-# Tera Cricket Dashboard
+# Cricket D3 - Dismissal Distribution Dashboard
 
 This is a full-stack web application that provides a dashboard for cricket players' dismissal statistics. Users can select a cricket format (ODI, T20, or IPL), a team, and a player to view detailed statistics about their dismissals.
 
